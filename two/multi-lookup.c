@@ -67,8 +67,8 @@ void resolve(void *output)
         // Strip newline
         if ((pos=strchr(ptr, '\n')) != NULL)
             *pos = '\0';
-        printf("ip: %s domain %s\n", ip, ptr);
         dnslookup(ptr, ip, 200);
+        printf("ip: %s domain %s\n", ip, ptr);
         pthread_mutex_lock(&file);
         pthread_mutex_unlock(&file);
     }
