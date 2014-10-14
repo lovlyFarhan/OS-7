@@ -19,7 +19,7 @@ util.o: util.c util.h
 	$(CC) $(CFLAGS) $<
 
 clean:
-	rm -f lookup queueTest pthread-hello
+	rm -f lookup queueTest pthread-hello multi-lookup
 	rm -f *.o
 	rm -f *~
 	rm -f results.txt

@@ -33,16 +33,22 @@ void* request(void* param)
         printf("ERROR: File is Empty");
     }  
 
-    getline(&line, &len, file);
     while ((read = getline(&line, &len, file)) != -1) {
         pthread_mutex_lock(&queueLock);
-        queue_push(&q, line);
+        int ret;
+        char * ptr;
+        ptr = malloc(strlen(line));
+        strcpy(ptr, line);
+        ret = queue_push(&q, ptr);
+        if (ret) {
+            printf("push returned: %d\n", ret);
+        }
         pthread_mutex_unlock(&queueLock);
     }
 
-    if (line) {
+    /*if (line) {
         free(line);
-    }
+    }*/
     return NULL;
 }
 
@@ -51,19 +57,15 @@ void resolve(void *output)
     (void) output;
     while (!queue_is_empty(&q)){
         // Take the domain off the queue
-        char *domain;
-        char *ip;
+        char *ptr;
+        char ip[100];
         queue_node *qn;
         pthread_mutex_lock(&queueLock);
-        qn = (queue_node *) queue_pop(&q);
+        ptr = queue_pop(&q);
         pthread_mutex_unlock(&queueLock);
-        domain = qn->payload;
-        // get an IP
-        printf("domain name: %s\n", domain);
-        dnslookup(domain, ip, 200);
         pthread_mutex_lock(&file);
-        printf("ip: %s\n", ip);
-        // write the comma and IP
+        printf("ip: %s domain %s", ip, ptr);
+        dnslookup(ptr, ip, 200);
         pthread_mutex_unlock(&file);
     }
 }
