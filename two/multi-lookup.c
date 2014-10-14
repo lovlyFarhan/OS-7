@@ -59,13 +59,17 @@ void resolve(void *output)
         // Take the domain off the queue
         char *ptr;
         char ip[100];
+        char *pos;
         queue_node *qn;
         pthread_mutex_lock(&queueLock);
         ptr = queue_pop(&q);
         pthread_mutex_unlock(&queueLock);
-        pthread_mutex_lock(&file);
-        printf("ip: %s domain %s", ip, ptr);
+        // Strip newline
+        if ((pos=strchr(ptr, '\n')) != NULL)
+            *pos = '\0';
+        printf("ip: %s domain %s\n", ip, ptr);
         dnslookup(ptr, ip, 200);
+        pthread_mutex_lock(&file);
         pthread_mutex_unlock(&file);
     }
 }
