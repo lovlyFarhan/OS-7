@@ -60,16 +60,24 @@ void resolve(void *output)
         char *ptr;
         char ip[100];
         char *pos;
-        queue_node *qn;
         pthread_mutex_lock(&queueLock);
         ptr = queue_pop(&q);
         pthread_mutex_unlock(&queueLock);
         // Strip newline
         if ((pos=strchr(ptr, '\n')) != NULL)
             *pos = '\0';
-        dnslookup(ptr, ip, 200);
+        if (dnslookup(ptr, ip, 64))
+            *ip = '\0';
         printf("ip: %s domain %s\n", ip, ptr);
+
         pthread_mutex_lock(&file);
+        FILE *f = fopen("results.txt", "a");
+        if (f == NULL) {
+            printf("Error opening file!\n");
+            exit(1);
+        }
+        fprintf(f, "%s,%s\n", ptr, ip);
+        fclose(f);
         pthread_mutex_unlock(&file);
     }
 }
