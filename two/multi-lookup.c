@@ -2,11 +2,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include "queue.h"
 
 #define THREAD_MAX 10
 
-pthread_mutex_t queue = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t queueLock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t file  = PTHREAD_MUTEX_INITIALIZER;
+queue q;
+int qSize = 1000000;
 
 typedef struct {
     char *fileName;
@@ -22,26 +25,24 @@ void* request(void* param)
     char *fileName;
     threadParam *param2 = param;
     fileName = param2->fileName;
-    printf("%s", fileName);
     file = fopen(fileName, "r");
 
     if (file == NULL){
         printf("ERROR: File is Empty");
     }  
 
+    getline(&line, &len, file);
     while ((read = getline(&line, &len, file)) != -1) {
-        printf("Retrieved line of length %d :\n", read);
         printf("%s", line);
+        pthread_mutex_lock(&queueLock);
+        queue_init(&q, qSize);
+        queue_push(&q, line);
+        pthread_mutex_unlock(&queueLock);
     }
 
     if (line) {
         free(line);
     }
-
-    // for each line
-    // Lock the queue
-    // Put the name on the queue
-    // Unlock the queue
     return NULL;
 }
 
