@@ -1,7 +1,9 @@
 // AUTHORS: Dominic Tonozzi, Jacob Resman and the right honorable Edward Crawford
+// Date: 14 October 2014
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <strings.h>
 #include <unistd.h>
 #include <errno.h>
 #include <sys/stat.h>
@@ -26,7 +28,7 @@ void* request(void* param)
 {
     // Read the file
     FILE *file;
-    char *line = NULL;
+    char line[1024];
     size_t len = 0;
     char read;
     char *fileName;
@@ -38,7 +40,7 @@ void* request(void* param)
         printf("ERROR: Invalid input file.");
     }  
 
-    while ((read = getline(&line, &len, file)) != -1) {
+    while (fscanf(file, "%1024s", line) > 0) {
         pthread_mutex_lock(&queueLock);
         while (queue_is_full(&q)) {
             pthread_mutex_unlock(&queueLock);
@@ -46,10 +48,7 @@ void* request(void* param)
             pthread_mutex_lock(&queueLock);
         }
         int ret;
-		char *ptr;
-		ptr = malloc(strlen(line));
-		strcpy(ptr, line);
-        ret = queue_push(&q, ptr);
+        ret = queue_push(&q, strdup(line));
         if (ret) {
             printf("push returned: %d\n", ret);
         }
