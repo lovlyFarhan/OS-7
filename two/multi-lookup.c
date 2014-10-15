@@ -1,3 +1,4 @@
+// AUTHORS: Dominic Tonozzi, Jacob Resman and the right honorable Edward Crawford
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,7 +16,7 @@ pthread_mutex_t file = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t rLock = PTHREAD_MUTEX_INITIALIZER;
 queue q;
 int threadsDone;
-int qSize = 1000000;
+int qSize = 10;
 
 typedef struct {
     char *fileName;
@@ -39,6 +40,11 @@ void* request(void* param)
 
     while ((read = getline(&line, &len, file)) != -1) {
         pthread_mutex_lock(&queueLock);
+        while (queue_is_full(&q)) {
+            pthread_mutex_unlock(&queueLock);
+            usleep(10);
+            pthread_mutex_lock(&queueLock);
+        }
         int ret;
         char * ptr;
         ptr = malloc(strlen(line));
