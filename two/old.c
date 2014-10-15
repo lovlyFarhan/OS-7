@@ -1,3 +1,4 @@
+// AUTHORS: Dominic Tonozzi, Jacob Resman and the right honorable Edward Crawford
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,7 +16,7 @@ pthread_mutex_t file = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t rLock = PTHREAD_MUTEX_INITIALIZER;
 queue q;
 int threadsDone;
-int qSize = 1000000;
+int qSize = 10;
 
 typedef struct {
     char *fileName;
@@ -39,21 +40,29 @@ void* request(void* param)
 
     while ((read = getline(&line, &len, file)) != -1) {
         pthread_mutex_lock(&queueLock);
+        while (queue_is_full(&q)) {
+            pthread_mutex_unlock(&queueLock);
+            usleep(10);
+            pthread_mutex_lock(&queueLock);
+        }
         int ret;
-		char *ptr;
-		ptr = malloc(strlen(line));
-		strcpy(ptr, line);
+        char * ptr;
+        ptr = malloc(strlen(line));
+        strcpy(ptr, line);
         ret = queue_push(&q, ptr);
         if (ret) {
             printf("push returned: %d\n", ret);
         }
-	    pthread_mutex_unlock(&queueLock);
+        pthread_mutex_unlock(&queueLock);
     }
-	
+
+    if (line) {
+        free(line);
+    }
     return NULL;
 }
 
-void* resolve(void *output)
+void resolve(void *output)
 {
     (void) output;
     while (!threadsDone | !queue_is_empty(&q)){
@@ -89,9 +98,8 @@ void* resolve(void *output)
         fprintf(f, "%s,%s\n", ptr, ip);
         fclose(f);
         pthread_mutex_unlock(&file);
-		free(ptr);
+        free(ptr);
     }
-	return NULL;
 }
 
 int main(int argc, char *argv[])
@@ -101,6 +109,7 @@ int main(int argc, char *argv[])
         printf("Error opening file!\n");
         exit(1);
     }
+    fprintf(f, "");
     fclose(f);
 
     queue_init(&q, qSize);
@@ -136,12 +145,5 @@ int main(int argc, char *argv[])
     for(i = 0; i<threadCount; i++){
         pthread_join(resolverThreads[i], NULL);
     }
-	queue_cleanup(&q);
-  
-	printf("param"); 
-	free(param);
-	printf("reqthread"); 
-	free(requesterThreads);
- 
+    
     return 0;
-}
