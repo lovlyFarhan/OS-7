@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <errno.h>
 #include <sys/stat.h>
 
 #include "queue.h"
@@ -13,7 +14,7 @@ pthread_mutex_t queueLock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t file = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t rLock = PTHREAD_MUTEX_INITIALIZER;
 queue q;
-int remaining;
+int threadsDone;
 int qSize = 1000000;
 
 typedef struct {
@@ -37,7 +38,6 @@ void* request(void* param)
     }  
 
     while ((read = getline(&line, &len, file)) != -1) {
-        printf("%s", line);
         pthread_mutex_lock(&queueLock);
         int ret;
         char * ptr;
@@ -53,16 +53,13 @@ void* request(void* param)
     if (line) {
         free(line);
     }
-    pthread_mutex_lock(&rLock);
-    remaining --;
-    pthread_mutex_unlock(&rLock);
     return NULL;
 }
 
 void resolve(void *output)
 {
     (void) output;
-    while (!remaining || !queue_is_empty(&q)){
+    while (!threadsDone | !queue_is_empty(&q)){
         // Take the domain off the queue
         char *ptr;
         char ip[100];
@@ -112,8 +109,8 @@ int main(int argc, char *argv[])
     queue_init(&q, qSize);
     // Create a thread for each file
     int threadCount = argc-1;
-    pthread_t requesterThreads[threadCount];
-    remaining = threadCount;
+    pthread_t *requesterThreads = malloc(sizeof(pthread_t)*threadCount);
+    threadsDone = 0;
     int i;
     int err;
     threadParam *param = malloc(sizeof(threadParam)*threadCount);
@@ -138,6 +135,7 @@ int main(int argc, char *argv[])
     for(i = 0; i<threadCount; i++){
         pthread_join(requesterThreads[i], NULL);
     }
+    threadsDone = 1;
     for(i = 0; i<threadCount; i++){
         pthread_join(resolverThreads[i], NULL);
     }
