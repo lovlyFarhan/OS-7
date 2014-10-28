@@ -58,14 +58,14 @@ int main(int argc, char* argv[]){
         }
     }
     /* Set policy if supplied */
-    if(argc > 2){
-        if(!strcmp(argv[2], "SCHED_OTHER")){
+    if(argc > 1){
+        if(!strcmp(argv[1], "SCHED_OTHER")){
             policy = SCHED_OTHER;
         }
-        else if(!strcmp(argv[2], "SCHED_FIFO")){
+        else if(!strcmp(argv[1], "SCHED_FIFO")){
             policy = SCHED_FIFO;
         }
-        else if(!strcmp(argv[2], "SCHED_RR")){
+        else if(!strcmp(argv[1], "SCHED_RR")){
             policy = SCHED_RR;
         }
         else{
