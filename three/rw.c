@@ -19,6 +19,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <string.h>
+#include <sys/wait.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sched.h>
@@ -53,33 +54,24 @@ int main(int argc, char* argv[]){
     ssize_t totalBytesWritten = 0;
     int totalWrites = 0;
     int inputFileResets = 0;
+    int forks;
+
+    forks = atoi(argv[2]);
 
     /* Process program arguments to select run-time parameters */
-    /* Set supplied transfer size or default if not supplied */
-    if(argc < 2){
-        transfersize = DEFAULT_TRANSFERSIZE;
+    transfersize = DEFAULT_TRANSFERSIZE;
+    if(!strcmp(argv[1], "SCHED_OTHER")){
+        policy = SCHED_OTHER;
+    }
+    else if(!strcmp(argv[1], "SCHED_FIFO")){
+        policy = SCHED_FIFO;
+    }
+    else if(!strcmp(argv[1], "SCHED_RR")){
+        policy = SCHED_RR;
     }
     else{
-        transfersize = atol(argv[1]);
-        if(transfersize < 1){
-            fprintf(stderr, "Bad transfersize value\n");
-            exit(EXIT_FAILURE);
-        }
-    }
-    if(argc > 2){
-        if(!strcmp(argv[2], "SCHED_OTHER")){
-            policy = SCHED_OTHER;
-        }
-        else if(!strcmp(argv[2], "SCHED_FIFO")){
-            policy = SCHED_FIFO;
-        }
-        else if(!strcmp(argv[2], "SCHED_RR")){
-            policy = SCHED_RR;
-        }
-        else{
-            fprintf(stderr, "Unhandeled scheduling policy\n");
-            exit(EXIT_FAILURE);
-        }
+        fprintf(stderr, "Unhandeled scheduling policy\n");
+        exit(EXIT_FAILURE);
     }
     /* Set process to max priority for given scheduler */
     param.sched_priority = sched_get_priority_max(policy);
@@ -93,6 +85,10 @@ int main(int argc, char* argv[]){
     }
     fprintf(stdout, "New Scheduling Policy: %d\n", sched_getscheduler(0));
     /* Set supplied block size or default if not supplied */
+
+    while (forks > 0 && !fork()) {
+        forks--;
+    }
 
     blocksize = DEFAULT_BLOCKSIZE;
     /* Set supplied input filename or default if not supplied */
@@ -234,5 +230,6 @@ int main(int argc, char* argv[]){
         exit(EXIT_FAILURE);
     }
 
+    wait(NULL);
     return EXIT_SUCCESS;
 }
