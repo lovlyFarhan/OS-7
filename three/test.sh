@@ -16,10 +16,8 @@ TIMEFORMAT="wall=%e user=%U system=%S CPU=%P i-switched=%c v-switched=%w"
 MAKE="make -s"
 
 echo Building code...
-$MAKE clean
-$MAKE
-
-echo Starting test runs...
+$MAKE clean &> /dev/null
+$MAKE &> /dev/null
 
 echo Calculating pi over $ITERATIONS iterations using SCHED_OTHER with 1 simultaneous process...
 /usr/bin/time -f "$TIMEFORMAT" ./pi-sched $ITERATIONS SCHED_OTHER > /dev/null
@@ -31,5 +29,4 @@ echo Calculating pi over $ITERATIONS iterations using SCHED_RR with 1 simultaneo
 /usr/bin/time -f "$TIMEFORMAT" sudo ./pi-sched $ITERATIONS SCHED_RR > /dev/null
 
 echo Copying $BYTESTOCOPY bytes in blocks from rwinput to rwoutput
-echo using SCHED_OTHER with 1 simultaneous process...
 /usr/bin/time -f "$TIMEFORMAT" ./rw $BYTESTOCOPY SCHED_OTHER > /dev/null
