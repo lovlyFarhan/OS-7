@@ -6,7 +6,7 @@
 #Create Date: 2012/03/09
 #Modify Date: 2012/03/21
 #Description:
-#	A simple bash script to run a signle copy of each test case
+#	A simple bash script to run a single copy of each test case
 #	and gather the relevent data.
 
 ITERATIONS=100000000
@@ -30,6 +30,6 @@ echo Calculating pi over $ITERATIONS iterations using SCHED_FIFO with 1 simultan
 echo Calculating pi over $ITERATIONS iterations using SCHED_RR with 1 simultaneous process...
 /usr/bin/time -f "$TIMEFORMAT" sudo ./pi-sched $ITERATIONS SCHED_RR > /dev/null
 
-echo Copying $BYTESTOCOPY bytes in blocks of $BLOCKSIZE from rwinput to rwoutput
+echo Copying $BYTESTOCOPY bytes in blocks from rwinput to rwoutput
 echo using SCHED_OTHER with 1 simultaneous process...
-/usr/bin/time -f "$TIMEFORMAT" ./rw $BYTESTOCOPY $BLOCKSIZE > /dev/null
+/usr/bin/time -f "$TIMEFORMAT" ./rw $BYTESTOCOPY SCHED_OTHER > /dev/null

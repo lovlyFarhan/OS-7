@@ -21,6 +21,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sched.h>
 
 /* Local Defines */
 #define MAXFILENAMELENGTH 80
@@ -32,11 +33,13 @@
 int main(int argc, char* argv[]){
 
     int rv;
+    int policy;
     int inputFD;
     int outputFD;
     char inputFilename[MAXFILENAMELENGTH];
     char outputFilename[MAXFILENAMELENGTH];
     char outputFilenameBase[MAXFILENAMELENGTH];
+    struct sched_param param;
 
     ssize_t transfersize = 0;
     ssize_t blocksize = 0; 
@@ -63,17 +66,35 @@ int main(int argc, char* argv[]){
             exit(EXIT_FAILURE);
         }
     }
-    /* Set supplied block size or default if not supplied */
-    if(argc < 3){
-        blocksize = DEFAULT_BLOCKSIZE;
-    }
-    else{
-        blocksize = atol(argv[2]);
-        if(blocksize < 1){
-            fprintf(stderr, "Bad blocksize value\n");
+    if(argc > 2){
+        if(!strcmp(argv[2], "SCHED_OTHER")){
+            policy = SCHED_OTHER;
+        }
+        else if(!strcmp(argv[2], "SCHED_FIFO")){
+            policy = SCHED_FIFO;
+        }
+        else if(!strcmp(argv[2], "SCHED_RR")){
+            policy = SCHED_RR;
+        }
+        else{
+            fprintf(stderr, "Unhandeled scheduling policy\n");
             exit(EXIT_FAILURE);
         }
     }
+    /* Set process to max priority for given scheduler */
+    param.sched_priority = sched_get_priority_max(policy);
+
+    /* Set new scheduler policy */
+    fprintf(stdout, "Current Scheduling Policy: %d\n", sched_getscheduler(0));
+    fprintf(stdout, "Setting Scheduling Policy to: %d\n", policy);
+    if(sched_setscheduler(0, policy, &param)){
+        perror("Error setting scheduler policy");
+        exit(EXIT_FAILURE);
+    }
+    fprintf(stdout, "New Scheduling Policy: %d\n", sched_getscheduler(0));
+    /* Set supplied block size or default if not supplied */
+
+    blocksize = DEFAULT_BLOCKSIZE;
     /* Set supplied input filename or default if not supplied */
     if(argc < 4){
         if(strnlen(DEFAULT_INPUTFILENAME, MAXFILENAMELENGTH) >= MAXFILENAMELENGTH){
