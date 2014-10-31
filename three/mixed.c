@@ -33,15 +33,6 @@ int main(int argc, char* argv[]){
     double pCircle = 0.0;
     double piCalc = 0.0;
 
-    char str[55];
-    sprintf(str, "mixedOut-%d.txt", getpid());
-   
-    FILE *f = fopen(str, "w");
-    if (f == NULL)
-    {
-        printf("Error opening file!\n");
-        exit(1);
-    }
 
    /* Process program arguments to select iterations and policy */
     iterations = 1000000;
@@ -60,7 +51,7 @@ int main(int argc, char* argv[]){
         exit(EXIT_FAILURE);
     }
 
-    forks = atoi(argv[2]);
+    forks = atoi(argv[2])-1;
 
     /* Set process to max priority for given scheduler */
     param.sched_priority = sched_get_priority_max(policy);
@@ -78,6 +69,16 @@ int main(int argc, char* argv[]){
         forks--;
     }
 
+    char str[55];
+    sprintf(str, "mixedOut-%d.txt", getpid());
+   
+    FILE *f = fopen(str, "w");
+    if (f == NULL)
+    {
+        printf("Error opening file!\n");
+        exit(1);
+    }
+        
     /* Calculate pi using statistical methode across all iterations*/
     for(i=0; i<iterations; i++){
         x = (random() % (RADIUS * 2)) - RADIUS;
