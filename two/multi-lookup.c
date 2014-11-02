@@ -5,8 +5,8 @@
 
 #define THREAD_MAX 10
 
-pthread_mutex_t file = PTHREAD_MUTEX_INITALIZER;
-pthread_mutex_t queue = PTHREAD_MUTEX_INITALIZER;
+pthread_mutex_t file = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t queue = PTHREAD_MUTEX_INITIALIZER;
 
 void request(char input[])
 {
