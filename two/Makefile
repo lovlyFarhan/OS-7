@@ -6,16 +6,10 @@ LFLAGS = -Wall -Wextra -pthread
 
 all: multi-lookup
 
-multi-lookup : lookup multi-lookup.o
+multi-lookup : multi-lookup.o queue.o util.o
 	$(CC) $(LFLAGS) $^ -o $@
 
-multi-lookup :
-	$(CC) $(LFLAGS) $<
-
-lookup: lookup.o queue.o util.o
-	$(CC) $(LFLAGS) $^ -o $@
-
-lookup.o: lookup.c
+multi-lookup.o: multi-lookup.c multi-lookup.h
 	$(CC) $(CFLAGS) $<
 
 queue.o: queue.c queue.h
@@ -25,7 +19,7 @@ util.o: util.c util.h
 	$(CC) $(CFLAGS) $<
 
 clean:
-	rm -f lookup queueTest pthread-hello
+	rm -f lookup queueTest pthread-hello multi-lookup
 	rm -f *.o
 	rm -f *~
 	rm -f results.txt
