@@ -1,0 +1,54 @@
+pi-sched SCHED_OTHER 7
+wall=0.26 user=0.65 system=0.00 CPU=247% i-switched=112 v-switched=13
+pi-sched SCHED_OTHER 70
+wall=1.68 user=5.84 system=0.03 CPU=349% i-switched=1394 v-switched=135
+pi-sched SCHED_OTHER 700
+wall=17.18 user=58.03 system=4.39 CPU=363% i-switched=12683 v-switched=1398
+pi-sched SCHED_FIFO 7
+wall=0.16 user=0.65 system=0.00 CPU=399% i-switched=1 v-switched=15
+pi-sched SCHED_FIFO 70
+wall=1.86 user=7.10 system=0.02 CPU=383% i-switched=4 v-switched=134
+pi-sched SCHED_FIFO 700
+wall=16.94 user=58.04 system=4.36 CPU=368% i-switched=66 v-switched=1399
+pi-sched SCHED_RR 7
+wall=0.26 user=0.99 system=0.00 CPU=374% i-switched=2 v-switched=14
+pi-sched SCHED_RR 70
+wall=2.01 user=7.71 system=0.02 CPU=384% i-switched=5 v-switched=141
+pi-sched SCHED_RR 700
+wall=17.03 user=58.34 system=4.37 CPU=368% i-switched=68 v-switched=1401
+rw SCHED_OTHER 7
+wall=0.00 user=0.00 system=0.00 CPU=150% i-switched=3 v-switched=13
+rw SCHED_OTHER 70
+wall=0.02 user=0.01 system=0.03 CPU=181% i-switched=10 v-switched=141
+rw SCHED_OTHER 700
+wall=4.12 user=0.14 system=4.00 CPU=100% i-switched=887 v-switched=1394
+rw SCHED_FIFO 7
+wall=0.00 user=0.00 system=0.00 CPU=233% i-switched=1 v-switched=15
+rw SCHED_FIFO 70
+wall=0.02 user=0.01 system=0.03 CPU=204% i-switched=1 v-switched=138
+rw SCHED_FIFO 700
+wall=4.02 user=0.16 system=4.27 CPU=110% i-switched=1 v-switched=1395
+rw SCHED_RR 7
+wall=0.00 user=0.00 system=0.00 CPU=233% i-switched=1 v-switched=12
+rw SCHED_RR 70
+wall=0.02 user=0.01 system=0.04 CPU=220% i-switched=1 v-switched=139
+rw SCHED_RR 700
+wall=4.15 user=0.17 system=4.40 CPU=110% i-switched=3 v-switched=1403
+mixed SCHED_OTHER 7
+wall=1.10 user=3.63 system=0.11 CPU=340% i-switched=473 v-switched=12
+mixed SCHED_OTHER 70
+wall=10.14 user=36.69 system=1.21 CPU=373% i-switched=9843 v-switched=171
+mixed SCHED_OTHER 700
+wall=97.44 user=367.34 system=16.40 CPU=393% i-switched=101258 v-switched=1739
+mixed SCHED_FIFO 7
+wall=1.64 user=5.56 system=0.16 CPU=348% i-switched=10 v-switched=13
+mixed SCHED_FIFO 70
+wall=10.06 user=36.41 system=1.27 CPU=374% i-switched=37 v-switched=149
+mixed SCHED_FIFO 700
+wall=102.52 user=372.34 system=15.74 CPU=378% i-switched=425 v-switched=1400
+mixed SCHED_RR 7
+wall=1.92 user=7.13 system=0.21 CPU=381% i-switched=18 v-switched=13
+mixed SCHED_RR 70
+wall=9.96 user=36.71 system=1.11 CPU=379% i-switched=200 v-switched=129
+mixed SCHED_RR 700
+wall=101.33 user=367.74 system=15.44 CPU=378% i-switched=2128 v-switched=1374

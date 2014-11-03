@@ -95,6 +95,7 @@ int main(int argc, char* argv[]){
     }
 
     fclose(f);
+    unlink(str);
     
     wait(NULL);
     return 0;

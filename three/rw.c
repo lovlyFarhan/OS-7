@@ -230,6 +230,7 @@ int main(int argc, char* argv[]){
         exit(EXIT_FAILURE);
     }
 
+    unlink(outputFilename);
     wait(NULL);
     return EXIT_SUCCESS;
 }
