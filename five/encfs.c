@@ -12,6 +12,7 @@ This program can be distributed under the terms of the GNU GPL.
 See the file COPYING.
 
 gcc -Wall `pkg-config fuse --cflags` encfs.c -o pa5-encfs `pkg-config fuse --libs`
+./pa5-encfs pass /home/nico/OS/five/mirror mount
 */
 
 char *key_phrase;
