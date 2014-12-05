@@ -1,104 +1,426 @@
 /*
-  FUSE: Filesystem in Userspace
-  Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
+FUSE: Filesystem in Userspace
+Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
 
-  Source: fuse-2.8.7.tar.gz examples directory
-  http://sourceforge.net/projects/fuse/files/fuse-2.X/
+Source: fuse-2.8.7.tar.gz examples directory
+http://sourceforge.net/projects/fuse/files/fuse-2.X/
 
-  See FUSE wiki for details:
-  http://sourceforge.net/apps/mediawiki/fuse/index.php?title=Hello_World
+See FUSE wiki for details:
+http://sourceforge.net/apps/mediawiki/fuse/index.php?title=Hello_World
 
-  This program can be distributed under the terms of the GNU GPL.
-  See the file COPYING.
+This program can be distributed under the terms of the GNU GPL.
+See the file COPYING.
 
-  gcc -Wall `pkg-config fuse --cflags` hello.c -o hello `pkg-config fuse --libs`
+gcc -Wall `pkg-config fuse --cflags` encfs.c -o pa5-encfs `pkg-config fuse --libs`
 */
 
+char *key_phrase;
+char *mirror_dir;
+char *mount_point;
+char current_dir[256];
+
 #define FUSE_USE_VERSION 28
+#define HAVE_SETXATTR
+
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#ifdef linux
+#define _XOPEN_SOURCE 500
+#endif
 
 #include <fuse.h>
 #include <stdio.h>
 #include <string.h>
-#include <errno.h>
+#include <unistd.h>
 #include <fcntl.h>
+#include <dirent.h>
+#include <errno.h>
+#include <sys/time.h>
+#ifdef HAVE_SETXATTR
+#include <sys/xattr.h>
+#endif
 
-static const char *hello_str = "Hello World!\n";
-char *hello_path = "/wat";
-
-static int hello_getattr(const char *path, struct stat *stbuf)
+void mycat(const char * dir)
 {
-	int res = 0;
-
-	memset(stbuf, 0, sizeof(struct stat));
-	if (strcmp(path, "/") == 0) {
-		stbuf->st_mode = S_IFDIR | 0755;
-		stbuf->st_nlink = 2;
-	} else if (strcmp(path, hello_path) == 0) {
-		stbuf->st_mode = S_IFREG | 0444;
-		stbuf->st_nlink = 1;
-		stbuf->st_size = strlen(hello_str);
-	} else
-		res = -ENOENT;
-
-	return res;
+    strcpy(current_dir, mirror_dir);
+    strcat(current_dir, dir);
 }
 
-static int hello_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-			 off_t offset, struct fuse_file_info *fi)
+static int xmp_getattr(const char *path, struct stat *stbuf)
 {
-	(void) offset;
-	(void) fi;
+    int res;
 
-	if (strcmp(path, "/") != 0)
-		return -ENOENT;
+    mycat(path);
+    res = lstat(current_dir, stbuf);
+    printf("file: %s\n", current_dir);
+    if (res == -1)
+        return -errno;
 
-	filler(buf, ".", NULL, 0);
-	filler(buf, "..", NULL, 0);
-	filler(buf, hello_path + 1, NULL, 0);
-
-	return 0;
+    return 0;
 }
 
-static int hello_open(const char *path, struct fuse_file_info *fi)
+static int xmp_access(const char *path, int mask)
 {
-	if (strcmp(path, hello_path) != 0)
-		return -ENOENT;
+    int res;
 
-	if ((fi->flags & 3) != O_RDONLY)
-		return -EACCES;
+    res = access(current_dir, mask);
+    if (res == -1)
+        return -errno;
 
-	return 0;
+    return 0;
 }
 
-static int hello_read(const char *path, char *buf, size_t size, off_t offset,
-		      struct fuse_file_info *fi)
+static int xmp_readlink(const char *path, char *buf, size_t size)
 {
-	size_t len;
-	(void) fi;
-	if(strcmp(path, hello_path) != 0)
-		return -ENOENT;
+    int res;
 
-	len = strlen(hello_str);
-	if (offset < (int)len) {
-		if (offset + size > len)
-			size = len - offset;
-		memcpy(buf, hello_str + offset, size);
-	} else
-		size = 0;
+    res = readlink(current_dir, buf, size - 1);
+    if (res == -1)
+        return -errno;
 
-	return size;
+    buf[res] = '\0';
+    return 0;
 }
 
-static struct fuse_operations hello_oper = {
-	.getattr	= hello_getattr,
-	.readdir	= hello_readdir,
-	.open		= hello_open,
-	.read		= hello_read,
+
+static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
+        off_t offset, struct fuse_file_info *fi)
+{
+    DIR *dp;
+    struct dirent *de;
+
+    (void) offset;
+    (void) fi;
+
+    dp = opendir(current_dir);
+    if (dp == NULL)
+        return -errno;
+
+    while ((de = readdir(dp)) != NULL) {
+        struct stat st;
+        memset(&st, 0, sizeof(st));
+        st.st_ino = de->d_ino;
+        st.st_mode = de->d_type << 12;
+        if (filler(buf, de->d_name, &st, 0))
+            break;
+    }
+
+    closedir(dp);
+    return 0;
+}
+
+static int xmp_mknod(const char *path, mode_t mode, dev_t rdev)
+{
+    int res;
+
+    /* On Linux this could just be 'mknod(current_dir, mode, rdev)' but this
+       is more portable */
+    if (S_ISREG(mode)) {
+        res = open(current_dir, O_CREAT | O_EXCL | O_WRONLY, mode);
+        if (res >= 0)
+            res = close(res);
+    } else if (S_ISFIFO(mode))
+        res = mkfifo(current_dir, mode);
+    else
+        res = mknod(current_dir, mode, rdev);
+    if (res == -1)
+        return -errno;
+
+    return 0;
+}
+
+static int xmp_mkdir(const char *path, mode_t mode)
+{
+    int res;
+
+    res = mkdir(current_dir, mode);
+    if (res == -1)
+        return -errno;
+
+    return 0;
+}
+
+static int xmp_unlink(const char *path)
+{
+    int res;
+
+    res = unlink(current_dir);
+    if (res == -1)
+        return -errno;
+
+    return 0;
+}
+
+static int xmp_rmdir(const char *path)
+{
+    int res;
+
+    res = rmdir(current_dir);
+    if (res == -1)
+        return -errno;
+
+    return 0;
+}
+
+static int xmp_symlink(const char *from, const char *to)
+{
+    int res;
+
+    res = symlink(from, to);
+    if (res == -1)
+        return -errno;
+
+    return 0;
+}
+
+static int xmp_rename(const char *from, const char *to)
+{
+    int res;
+
+    res = rename(from, to);
+    if (res == -1)
+        return -errno;
+
+    return 0;
+}
+
+static int xmp_link(const char *from, const char *to)
+{
+    int res;
+
+    res = link(from, to);
+    if (res == -1)
+        return -errno;
+
+    return 0;
+}
+
+static int xmp_chmod(const char *path, mode_t mode)
+{
+    int res;
+
+    res = chmod(current_dir, mode);
+    if (res == -1)
+        return -errno;
+
+    return 0;
+}
+
+static int xmp_chown(const char *path, uid_t uid, gid_t gid)
+{
+    int res;
+
+    res = lchown(current_dir, uid, gid);
+    if (res == -1)
+        return -errno;
+
+    return 0;
+}
+
+static int xmp_truncate(const char *path, off_t size)
+{
+    int res;
+
+    res = truncate(current_dir, size);
+    if (res == -1)
+        return -errno;
+
+    return 0;
+}
+
+static int xmp_utimens(const char *path, const struct timespec ts[2])
+{
+    int res;
+    struct timeval tv[2];
+
+    tv[0].tv_sec = ts[0].tv_sec;
+    tv[0].tv_usec = ts[0].tv_nsec / 1000;
+    tv[1].tv_sec = ts[1].tv_sec;
+    tv[1].tv_usec = ts[1].tv_nsec / 1000;
+
+    res = utimes(current_dir, tv);
+    if (res == -1)
+        return -errno;
+
+    return 0;
+}
+
+static int xmp_open(const char *path, struct fuse_file_info *fi)
+{
+    int res;
+
+    res = open(current_dir, fi->flags);
+    if (res == -1)
+        return -errno;
+
+    close(res);
+    return 0;
+}
+
+static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
+        struct fuse_file_info *fi)
+{
+    int fd;
+    int res;
+
+    (void) fi;
+    fd = open(current_dir, O_RDONLY);
+    printf("path to file: %s\n", current_dir);
+    if (fd == -1)
+        return -errno;
+
+    res = pread(fd, buf, size, offset);
+    if (res == -1)
+        res = -errno;
+
+    close(fd);
+    return res;
+}
+
+static int xmp_write(const char *path, const char *buf, size_t size,
+        off_t offset, struct fuse_file_info *fi)
+{
+    int fd;
+    int res;
+
+    (void) fi;
+    fd = open(current_dir, O_WRONLY);
+    if (fd == -1)
+        return -errno;
+
+    res = pwrite(fd, buf, size, offset);
+    if (res == -1)
+        res = -errno;
+
+    close(fd);
+    return res;
+}
+
+static int xmp_statfs(const char *path, struct statvfs *stbuf)
+{
+    int res;
+
+    res = statvfs(current_dir, stbuf);
+    if (res == -1)
+        return -errno;
+
+    return 0;
+}
+
+static int xmp_create(const char* path, mode_t mode, struct fuse_file_info* fi) {
+
+    (void) fi;
+
+    int res;
+    res = creat(current_dir, mode);
+    if(res == -1)
+        return -errno;
+
+    close(res);
+
+    return 0;
+}
+
+
+static int xmp_release(const char *path, struct fuse_file_info *fi)
+{
+    /* Just a stub.	 This method is optional and can safely be left
+       unimplemented */
+
+    (void) path;
+    (void) fi;
+    return 0;
+}
+
+static int xmp_fsync(const char *path, int isdatasync,
+        struct fuse_file_info *fi)
+{
+    /* Just a stub.	 This method is optional and can safely be left
+       unimplemented */
+
+    (void) path;
+    (void) isdatasync;
+    (void) fi;
+    return 0;
+}
+
+#ifdef HAVE_SETXATTR
+static int xmp_setxattr(const char *path, const char *name, const char *value,
+        size_t size, int flags)
+{
+    int res = lsetxattr(current_dir, name, value, size, flags);
+    if (res == -1)
+        return -errno;
+    return 0;
+}
+
+static int xmp_getxattr(const char *path, const char *name, char *value,
+        size_t size)
+{
+    int res = lgetxattr(current_dir, name, value, size);
+    if (res == -1)
+        return -errno;
+    return res;
+}
+
+static int xmp_listxattr(const char *path, char *list, size_t size)
+{
+    int res = llistxattr(current_dir, list, size);
+    if (res == -1)
+        return -errno;
+    return res;
+}
+
+static int xmp_removexattr(const char *path, const char *name)
+{
+    int res = lremovexattr(current_dir, name);
+    if (res == -1)
+        return -errno;
+    return 0;
+}
+#endif /* HAVE_SETXATTR */
+
+static struct fuse_operations xmp_oper = {
+    .getattr	= xmp_getattr,
+    .access		= xmp_access,
+    .readlink	= xmp_readlink,
+    .readdir	= xmp_readdir,
+    .mknod		= xmp_mknod,
+    .mkdir		= xmp_mkdir,
+    .symlink	= xmp_symlink,
+    .unlink		= xmp_unlink,
+    .rmdir		= xmp_rmdir,
+    .rename		= xmp_rename,
+    .link		= xmp_link,
+    .chmod		= xmp_chmod,
+    .chown		= xmp_chown,
+    .truncate	= xmp_truncate,
+    .utimens	= xmp_utimens,
+    .open		= xmp_open,
+    .read		= xmp_read,
+    .write		= xmp_write,
+    .statfs		= xmp_statfs,
+    .create     = xmp_create,
+    .release	= xmp_release,
+    .fsync		= xmp_fsync,
+#ifdef HAVE_SETXATTR
+    .setxattr	= xmp_setxattr,
+    .getxattr	= xmp_getxattr,
+    .listxattr	= xmp_listxattr,
+    .removexattr	= xmp_removexattr,
+#endif
 };
 
 int main(int argc, char *argv[])
 {
-    hello_path = argv[3];
-    argc -= 1;
-	return fuse_main(argc, argv, &hello_oper, NULL);
+    key_phrase  = argv[1];
+    mirror_dir  = argv[2];
+    mount_point = argv[3];
+    char *args[3];
+    args[0] = argv[0];
+    args[1] = mount_point;
+    args[2] = "-d";
+    return fuse_main(3, args, &xmp_oper, NULL);
 }
