@@ -52,8 +52,8 @@ void mycat(const char * dir)
 static int xmp_getattr(const char *path, struct stat *stbuf)
 {
     int res;
-
     mycat(path);
+
     res = lstat(current_dir, stbuf);
     printf("file: %s\n", current_dir);
     if (res == -1)
@@ -65,6 +65,7 @@ static int xmp_getattr(const char *path, struct stat *stbuf)
 static int xmp_access(const char *path, int mask)
 {
     int res;
+    mycat(path);
 
     res = access(current_dir, mask);
     if (res == -1)
@@ -76,6 +77,7 @@ static int xmp_access(const char *path, int mask)
 static int xmp_readlink(const char *path, char *buf, size_t size)
 {
     int res;
+    mycat(path);
 
     res = readlink(current_dir, buf, size - 1);
     if (res == -1)
@@ -91,6 +93,7 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 {
     DIR *dp;
     struct dirent *de;
+    mycat(path);
 
     (void) offset;
     (void) fi;
@@ -115,6 +118,7 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 static int xmp_mknod(const char *path, mode_t mode, dev_t rdev)
 {
     int res;
+    mycat(path);
 
     /* On Linux this could just be 'mknod(current_dir, mode, rdev)' but this
        is more portable */
@@ -135,6 +139,7 @@ static int xmp_mknod(const char *path, mode_t mode, dev_t rdev)
 static int xmp_mkdir(const char *path, mode_t mode)
 {
     int res;
+    mycat(path);
 
     res = mkdir(current_dir, mode);
     if (res == -1)
@@ -146,6 +151,7 @@ static int xmp_mkdir(const char *path, mode_t mode)
 static int xmp_unlink(const char *path)
 {
     int res;
+    mycat(path);
 
     res = unlink(current_dir);
     if (res == -1)
@@ -157,6 +163,7 @@ static int xmp_unlink(const char *path)
 static int xmp_rmdir(const char *path)
 {
     int res;
+    mycat(path);
 
     res = rmdir(current_dir);
     if (res == -1)
@@ -201,6 +208,7 @@ static int xmp_link(const char *from, const char *to)
 static int xmp_chmod(const char *path, mode_t mode)
 {
     int res;
+    mycat(path);
 
     res = chmod(current_dir, mode);
     if (res == -1)
@@ -212,6 +220,7 @@ static int xmp_chmod(const char *path, mode_t mode)
 static int xmp_chown(const char *path, uid_t uid, gid_t gid)
 {
     int res;
+    mycat(path);
 
     res = lchown(current_dir, uid, gid);
     if (res == -1)
@@ -223,6 +232,7 @@ static int xmp_chown(const char *path, uid_t uid, gid_t gid)
 static int xmp_truncate(const char *path, off_t size)
 {
     int res;
+    mycat(path);
 
     res = truncate(current_dir, size);
     if (res == -1)
@@ -235,6 +245,7 @@ static int xmp_utimens(const char *path, const struct timespec ts[2])
 {
     int res;
     struct timeval tv[2];
+    mycat(path);
 
     tv[0].tv_sec = ts[0].tv_sec;
     tv[0].tv_usec = ts[0].tv_nsec / 1000;
@@ -251,6 +262,7 @@ static int xmp_utimens(const char *path, const struct timespec ts[2])
 static int xmp_open(const char *path, struct fuse_file_info *fi)
 {
     int res;
+    mycat(path);
 
     res = open(current_dir, fi->flags);
     if (res == -1)
@@ -265,6 +277,7 @@ static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
 {
     int fd;
     int res;
+    mycat(path);
 
     (void) fi;
     fd = open(current_dir, O_RDONLY);
@@ -285,6 +298,7 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 {
     int fd;
     int res;
+    mycat(path);
 
     (void) fi;
     fd = open(current_dir, O_WRONLY);
@@ -302,6 +316,7 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 static int xmp_statfs(const char *path, struct statvfs *stbuf)
 {
     int res;
+    mycat(path);
 
     res = statvfs(current_dir, stbuf);
     if (res == -1)
@@ -313,6 +328,7 @@ static int xmp_statfs(const char *path, struct statvfs *stbuf)
 static int xmp_create(const char* path, mode_t mode, struct fuse_file_info* fi) {
 
     (void) fi;
+    mycat(path);
 
     int res;
     res = creat(current_dir, mode);
@@ -329,6 +345,7 @@ static int xmp_release(const char *path, struct fuse_file_info *fi)
 {
     /* Just a stub.	 This method is optional and can safely be left
        unimplemented */
+    mycat(path);
 
     (void) path;
     (void) fi;
@@ -344,6 +361,7 @@ static int xmp_fsync(const char *path, int isdatasync,
     (void) path;
     (void) isdatasync;
     (void) fi;
+    mycat(path);
     return 0;
 }
 
@@ -352,6 +370,7 @@ static int xmp_setxattr(const char *path, const char *name, const char *value,
         size_t size, int flags)
 {
     int res = lsetxattr(current_dir, name, value, size, flags);
+    mycat(path);
     if (res == -1)
         return -errno;
     return 0;
@@ -361,6 +380,7 @@ static int xmp_getxattr(const char *path, const char *name, char *value,
         size_t size)
 {
     int res = lgetxattr(current_dir, name, value, size);
+    mycat(path);
     if (res == -1)
         return -errno;
     return res;
@@ -369,6 +389,7 @@ static int xmp_getxattr(const char *path, const char *name, char *value,
 static int xmp_listxattr(const char *path, char *list, size_t size)
 {
     int res = llistxattr(current_dir, list, size);
+    mycat(path);
     if (res == -1)
         return -errno;
     return res;
@@ -377,6 +398,7 @@ static int xmp_listxattr(const char *path, char *list, size_t size)
 static int xmp_removexattr(const char *path, const char *name)
 {
     int res = lremovexattr(current_dir, name);
+    mycat(path);
     if (res == -1)
         return -errno;
     return 0;
