@@ -41,6 +41,8 @@ char current_dir[256];
 #include <dirent.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <sys/mman.h>
+
 #ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
 #endif
@@ -275,54 +277,64 @@ static int xmp_open(const char *path, struct fuse_file_info *fi)
 static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
         struct fuse_file_info *fi)
 {
-    FILE *inFD;
-    FILE *outFD;
-    int res;
-    int action;
+    FILE *out_fp;
+    FILE *in_fp;
+    char *shm_path;
     int fd;
-    (void) fi;
-    char outFile[256];
+    int action;
+    void *map;
+    (void) offset; //TODO
+    (void) fi; //TODO
     set_dir(path);
+    shm_path = "dec";
 
-    inFD = fopen(current_dir, "r");
+    fd = shm_open(shm_path, O_RDWR | O_CREAT | O_TRUNC, 0600);
+    ftruncate(fd, size);
+    in_fp  = fopen(current_dir, "r");
+    out_fp = fdopen(fd, "w");
+    action = 0;
+    int err = do_crypt(in_fp, out_fp, action, key_phrase);
+    printf("do_crypt err: %d", err);
 
-    strcpy(outFile, current_dir);
-    strcat(outFile, ".dec");
-    outFD = fopen(outFile, "w");
+    map = mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
+    memcpy(buf, map, size);
+    printf("decrypted file: %s\n", buf);
 
-    action = 0; // decrypt
-    if(!do_crypt(inFD, outFD, action, key_phrase)){
-        fprintf(stderr, "do_crypt failed\n");
-        res = -errno;
-    }
-
-    fd = open(outFile, O_RDONLY);
-    res = pread(fd, buf, size, offset);
-    if (res == -1)
-        res = -errno;
-
+    shm_unlink("dec");
+    fclose(in_fp);
+    fclose(out_fp);
     close(fd);
-    return res;
+    return size;
 }
 
 static int xmp_write(const char *path, const char *buf, size_t size,
         off_t offset, struct fuse_file_info *fi)
 {
+    FILE *out_fp;
+    FILE *in_fp;
+    char *shm_path;
     int fd;
-    int res;
+    int action;
+    void *map;
+    (void) offset; //TODO
+    (void) fi; //TODO
     set_dir(path);
+    shm_path = "enc";
 
-    (void) fi;
-    fd = open(current_dir, O_WRONLY);
-    if (fd == -1)
-        return -errno;
+    fd = shm_open(shm_path, O_RDWR | O_CREAT | O_TRUNC, 0600);
+    ftruncate(fd, size);
+    map = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    memcpy(map, buf, size);
 
-    res = pwrite(fd, buf, size, offset);
-    if (res == -1)
-        res = -errno;
-
+    in_fp  = fdopen(fd, "r");
+    out_fp = fopen(current_dir, "w");
+    action = 1;
+    do_crypt(in_fp, out_fp, action, key_phrase);
+    shm_unlink(shm_path);
+    fclose(in_fp);
+    fclose(out_fp);
     close(fd);
-    return res;
+    return size;
 }
 
 static int xmp_statfs(const char *path, struct statvfs *stbuf)
