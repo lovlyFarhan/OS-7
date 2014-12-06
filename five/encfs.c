@@ -11,7 +11,8 @@ http://sourceforge.net/apps/mediawiki/fuse/index.php?title=Hello_World
 This program can be distributed under the terms of the GNU GPL.
 See the file COPYING.
 
-gcc -Wall `pkg-config fuse --cflags` encfs.c -o pa5-encfs `pkg-config fuse --libs`
+I should really learn to write a makefile:
+gcc -Wall -Wextra `pkg-config fuse --cflags` encfs.c -o pa5-encfs `pkg-config fuse --libs` aes-crypt.c aes-crypt.h -l crypto
 ./pa5-encfs pass /home/nico/OS/five/mirror mount
 */
 
@@ -22,6 +23,7 @@ char current_dir[256];
 
 #define FUSE_USE_VERSION 28
 #define HAVE_SETXATTR
+#include "aes-crypt.h"
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -43,7 +45,7 @@ char current_dir[256];
 #include <sys/xattr.h>
 #endif
 
-void mycat(const char * dir)
+void set_dir(const char * dir)
 {
     strcpy(current_dir, mirror_dir);
     strcat(current_dir, dir);
@@ -52,10 +54,9 @@ void mycat(const char * dir)
 static int xmp_getattr(const char *path, struct stat *stbuf)
 {
     int res;
-    mycat(path);
+    set_dir(path);
 
     res = lstat(current_dir, stbuf);
-    printf("file: %s\n", current_dir);
     if (res == -1)
         return -errno;
 
@@ -65,7 +66,7 @@ static int xmp_getattr(const char *path, struct stat *stbuf)
 static int xmp_access(const char *path, int mask)
 {
     int res;
-    mycat(path);
+    set_dir(path);
 
     res = access(current_dir, mask);
     if (res == -1)
@@ -77,7 +78,7 @@ static int xmp_access(const char *path, int mask)
 static int xmp_readlink(const char *path, char *buf, size_t size)
 {
     int res;
-    mycat(path);
+    set_dir(path);
 
     res = readlink(current_dir, buf, size - 1);
     if (res == -1)
@@ -93,7 +94,7 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 {
     DIR *dp;
     struct dirent *de;
-    mycat(path);
+    set_dir(path);
 
     (void) offset;
     (void) fi;
@@ -118,7 +119,7 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 static int xmp_mknod(const char *path, mode_t mode, dev_t rdev)
 {
     int res;
-    mycat(path);
+    set_dir(path);
 
     /* On Linux this could just be 'mknod(current_dir, mode, rdev)' but this
        is more portable */
@@ -139,7 +140,7 @@ static int xmp_mknod(const char *path, mode_t mode, dev_t rdev)
 static int xmp_mkdir(const char *path, mode_t mode)
 {
     int res;
-    mycat(path);
+    set_dir(path);
 
     res = mkdir(current_dir, mode);
     if (res == -1)
@@ -151,7 +152,7 @@ static int xmp_mkdir(const char *path, mode_t mode)
 static int xmp_unlink(const char *path)
 {
     int res;
-    mycat(path);
+    set_dir(path);
 
     res = unlink(current_dir);
     if (res == -1)
@@ -163,7 +164,7 @@ static int xmp_unlink(const char *path)
 static int xmp_rmdir(const char *path)
 {
     int res;
-    mycat(path);
+    set_dir(path);
 
     res = rmdir(current_dir);
     if (res == -1)
@@ -208,7 +209,7 @@ static int xmp_link(const char *from, const char *to)
 static int xmp_chmod(const char *path, mode_t mode)
 {
     int res;
-    mycat(path);
+    set_dir(path);
 
     res = chmod(current_dir, mode);
     if (res == -1)
@@ -220,7 +221,7 @@ static int xmp_chmod(const char *path, mode_t mode)
 static int xmp_chown(const char *path, uid_t uid, gid_t gid)
 {
     int res;
-    mycat(path);
+    set_dir(path);
 
     res = lchown(current_dir, uid, gid);
     if (res == -1)
@@ -232,7 +233,7 @@ static int xmp_chown(const char *path, uid_t uid, gid_t gid)
 static int xmp_truncate(const char *path, off_t size)
 {
     int res;
-    mycat(path);
+    set_dir(path);
 
     res = truncate(current_dir, size);
     if (res == -1)
@@ -245,7 +246,7 @@ static int xmp_utimens(const char *path, const struct timespec ts[2])
 {
     int res;
     struct timeval tv[2];
-    mycat(path);
+    set_dir(path);
 
     tv[0].tv_sec = ts[0].tv_sec;
     tv[0].tv_usec = ts[0].tv_nsec / 1000;
@@ -262,8 +263,7 @@ static int xmp_utimens(const char *path, const struct timespec ts[2])
 static int xmp_open(const char *path, struct fuse_file_info *fi)
 {
     int res;
-    mycat(path);
-
+    set_dir(path);
     res = open(current_dir, fi->flags);
     if (res == -1)
         return -errno;
@@ -275,16 +275,28 @@ static int xmp_open(const char *path, struct fuse_file_info *fi)
 static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
         struct fuse_file_info *fi)
 {
-    int fd;
+    FILE *inFD;
+    FILE *outFD;
     int res;
-    mycat(path);
-
+    int action;
+    int fd;
     (void) fi;
-    fd = open(current_dir, O_RDONLY);
-    printf("path to file: %s\n", current_dir);
-    if (fd == -1)
-        return -errno;
+    char outFile[256];
+    set_dir(path);
 
+    inFD = fopen(current_dir, "r");
+
+    strcpy(outFile, current_dir);
+    strcat(outFile, ".dec");
+    outFD = fopen(outFile, "w");
+
+    action = 0; // decrypt
+    if(!do_crypt(inFD, outFD, action, key_phrase)){
+        fprintf(stderr, "do_crypt failed\n");
+        res = -errno;
+    }
+
+    fd = open(outFile, O_RDONLY);
     res = pread(fd, buf, size, offset);
     if (res == -1)
         res = -errno;
@@ -298,7 +310,7 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 {
     int fd;
     int res;
-    mycat(path);
+    set_dir(path);
 
     (void) fi;
     fd = open(current_dir, O_WRONLY);
@@ -316,7 +328,7 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 static int xmp_statfs(const char *path, struct statvfs *stbuf)
 {
     int res;
-    mycat(path);
+    set_dir(path);
 
     res = statvfs(current_dir, stbuf);
     if (res == -1)
@@ -328,7 +340,7 @@ static int xmp_statfs(const char *path, struct statvfs *stbuf)
 static int xmp_create(const char* path, mode_t mode, struct fuse_file_info* fi) {
 
     (void) fi;
-    mycat(path);
+    set_dir(path);
 
     int res;
     res = creat(current_dir, mode);
@@ -345,7 +357,7 @@ static int xmp_release(const char *path, struct fuse_file_info *fi)
 {
     /* Just a stub.	 This method is optional and can safely be left
        unimplemented */
-    mycat(path);
+    set_dir(path);
 
     (void) path;
     (void) fi;
@@ -361,7 +373,7 @@ static int xmp_fsync(const char *path, int isdatasync,
     (void) path;
     (void) isdatasync;
     (void) fi;
-    mycat(path);
+    set_dir(path);
     return 0;
 }
 
@@ -370,7 +382,7 @@ static int xmp_setxattr(const char *path, const char *name, const char *value,
         size_t size, int flags)
 {
     int res = lsetxattr(current_dir, name, value, size, flags);
-    mycat(path);
+    set_dir(path);
     if (res == -1)
         return -errno;
     return 0;
@@ -380,7 +392,7 @@ static int xmp_getxattr(const char *path, const char *name, char *value,
         size_t size)
 {
     int res = lgetxattr(current_dir, name, value, size);
-    mycat(path);
+    set_dir(path);
     if (res == -1)
         return -errno;
     return res;
@@ -389,7 +401,7 @@ static int xmp_getxattr(const char *path, const char *name, char *value,
 static int xmp_listxattr(const char *path, char *list, size_t size)
 {
     int res = llistxattr(current_dir, list, size);
-    mycat(path);
+    set_dir(path);
     if (res == -1)
         return -errno;
     return res;
@@ -398,7 +410,7 @@ static int xmp_listxattr(const char *path, char *list, size_t size)
 static int xmp_removexattr(const char *path, const char *name)
 {
     int res = lremovexattr(current_dir, name);
-    mycat(path);
+    set_dir(path);
     if (res == -1)
         return -errno;
     return 0;
@@ -438,6 +450,7 @@ static struct fuse_operations xmp_oper = {
 
 int main(int argc, char *argv[])
 {
+    (void) argc;
     key_phrase  = argv[1];
     mirror_dir  = argv[2];
     mount_point = argv[3];
