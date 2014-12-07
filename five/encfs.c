@@ -282,26 +282,25 @@ static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
     char *shm_path;
     int fd;
     int action;
-    void *map;
     (void) offset; //TODO
     (void) fi; //TODO
     set_dir(path);
     shm_path = "dec";
 
     fd = shm_open(shm_path, O_RDWR | O_CREAT | O_TRUNC, 0600);
-    ftruncate(fd, size);
+    ftruncate(fd, 0);
     in_fp  = fopen(current_dir, "r");
-    out_fp = fdopen(fd, "r+");
+    out_fp = fdopen(fd, "w");
     action = 0;
     if (!do_crypt(in_fp, out_fp, action, key_phrase))
         fprintf(stderr, "FAILURE: %d\n", errno);
-
-    map = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    memcpy(buf, map, size);
-    //shm_unlink("dec");
-    fclose(in_fp);
     fclose(out_fp);
+    fclose(in_fp);
     close(fd);
+    fd = open("/dev/shm/dec", O_RDONLY);
+    int i = read(fd, buf, 200);
+    fprintf(stderr, "bytes: %d read: %s err: %d\n", i, buf, errno);
+    shm_unlink("dec");
     return size;
 }
 
@@ -332,6 +331,7 @@ static int xmp_write(const char *path, const char *buf, size_t size,
     fclose(in_fp);
     fclose(out_fp);
     close(fd);
+    munmap(map,size);
     return size;
 }
 
