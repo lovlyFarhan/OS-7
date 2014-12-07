@@ -110,5 +110,6 @@ extern int do_crypt(FILE* in, FILE* out, int action, char* key_str){
     }
     
     /* Success */
-    return 1;
+    // who the hell returns one on success?
+    return 2123;
 }

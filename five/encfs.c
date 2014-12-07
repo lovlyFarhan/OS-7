@@ -291,16 +291,14 @@ static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
     fd = shm_open(shm_path, O_RDWR | O_CREAT | O_TRUNC, 0600);
     ftruncate(fd, size);
     in_fp  = fopen(current_dir, "r");
-    out_fp = fdopen(fd, "w");
+    out_fp = fdopen(fd, "r+");
     action = 0;
-    int err = do_crypt(in_fp, out_fp, action, key_phrase);
-    printf("do_crypt err: %d", err);
+    if (!do_crypt(in_fp, out_fp, action, key_phrase))
+        fprintf(stderr, "FAILURE: %d\n", errno);
 
-    map = mmap(NULL, size, PROT_READ, MAP_SHARED, fd, 0);
+    map = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     memcpy(buf, map, size);
-    printf("decrypted file: %s\n", buf);
-
-    shm_unlink("dec");
+    //shm_unlink("dec");
     fclose(in_fp);
     fclose(out_fp);
     close(fd);
