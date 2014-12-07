@@ -274,20 +274,18 @@ static int xmp_open(const char *path, struct fuse_file_info *fi)
     return 0;
 }
 
-static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
-        struct fuse_file_info *fi)
-{
+/*
+ * accepts a file descriptor to decrypt, a buffer to read it into, number of
+ * bytes to read and an offset
+ * returns number of bytes read.
+ */
+int eread(int fd, char *buf, size_t size, off_t offset) {
     FILE *out_fp;
     FILE *in_fp;
-    char *shm_path;
-    int fd;
     int action;
-    (void) offset; //TODO
-    (void) fi; //TODO
-    set_dir(path);
-    shm_path = "dec";
+    int i;
 
-    fd = shm_open(shm_path, O_RDWR | O_CREAT | O_TRUNC, 0600);
+    fd = shm_open("/dec", O_WRONLY | O_CREAT | O_TRUNC, 0600);
     ftruncate(fd, 0);
     in_fp  = fopen(current_dir, "r");
     out_fp = fdopen(fd, "w");
@@ -297,32 +295,53 @@ static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
     fclose(out_fp);
     fclose(in_fp);
     close(fd);
+
     fd = open("/dev/shm/dec", O_RDONLY);
-    int i = read(fd, buf, 200);
-    fprintf(stderr, "bytes: %d read: %s err: %d\n", i, buf, errno);
-    shm_unlink("dec");
-    return size;
+    i = pread(fd, buf, size, offset);
+    shm_unlink("/dec");
+    return i;
 }
 
-static int xmp_write(const char *path, const char *buf, size_t size,
-        off_t offset, struct fuse_file_info *fi)
+static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
+        struct fuse_file_info *fi)
 {
+	int fd;
+	int res;
+    set_dir(path);
+
+	(void) fi;
+	fd = open(current_dir, O_RDONLY);
+	if (fd == -1)
+		return -errno;
+
+	res = eread(fd, buf, size, offset);
+	if (res == -1)
+		res = -errno;
+
+	close(fd);
+	return res;
+}
+
+/*
+ * accepts a file descriptor to write ciphertext to, a plain text buffer
+ * to write, bytes to write and an offset.
+ * returns number of bytes written.
+ */
+
+int ewrite(int fd, const char *buf, size_t size, off_t offset) {
     FILE *out_fp;
     FILE *in_fp;
     char *shm_path;
-    int fd;
+    char *full_buf;
     int action;
-    void *map;
-    (void) offset; //TODO
-    (void) fi; //TODO
-    set_dir(path);
+
     shm_path = "enc";
+    fprintf(stderr, "offset: %d size: %d\n", offset, size);
+    full_buf = malloc(offset + size);
+    eread(fd, full_buf, offset, 0);
+    memcpy(full_buf, buf, size);
 
     fd = shm_open(shm_path, O_RDWR | O_CREAT | O_TRUNC, 0600);
-    ftruncate(fd, size);
-    map = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    memcpy(map, buf, size);
-
     in_fp  = fdopen(fd, "r");
     out_fp = fopen(current_dir, "w");
     action = 1;
@@ -331,8 +350,28 @@ static int xmp_write(const char *path, const char *buf, size_t size,
     fclose(in_fp);
     fclose(out_fp);
     close(fd);
-    munmap(map,size);
+    free(full_buf);
     return size;
+}
+
+static int xmp_write(const char *path, const char *buf, size_t size,
+        off_t offset, struct fuse_file_info *fi)
+{
+	int fd;
+	int res;
+    set_dir(path);
+
+	(void) fi;
+	fd = open(current_dir, O_WRONLY);
+	if (fd == -1)
+		return -errno;
+
+	res = ewrite(fd, buf, size, offset);
+	if (res == -1)
+		res = -errno;
+
+	close(fd);
+	return res;
 }
 
 static int xmp_statfs(const char *path, struct statvfs *stbuf)
@@ -391,8 +430,8 @@ static int xmp_fsync(const char *path, int isdatasync,
 static int xmp_setxattr(const char *path, const char *name, const char *value,
         size_t size, int flags)
 {
-    int res = lsetxattr(current_dir, name, value, size, flags);
     set_dir(path);
+    int res = lsetxattr(current_dir, name, value, size, flags);
     if (res == -1)
         return -errno;
     return 0;
@@ -401,8 +440,8 @@ static int xmp_setxattr(const char *path, const char *name, const char *value,
 static int xmp_getxattr(const char *path, const char *name, char *value,
         size_t size)
 {
-    int res = lgetxattr(current_dir, name, value, size);
     set_dir(path);
+    int res = lgetxattr(current_dir, name, value, size);
     if (res == -1)
         return -errno;
     return res;
@@ -410,8 +449,8 @@ static int xmp_getxattr(const char *path, const char *name, char *value,
 
 static int xmp_listxattr(const char *path, char *list, size_t size)
 {
-    int res = llistxattr(current_dir, list, size);
     set_dir(path);
+    int res = llistxattr(current_dir, list, size);
     if (res == -1)
         return -errno;
     return res;
@@ -419,8 +458,8 @@ static int xmp_listxattr(const char *path, char *list, size_t size)
 
 static int xmp_removexattr(const char *path, const char *name)
 {
-    int res = lremovexattr(current_dir, name);
     set_dir(path);
+    int res = lremovexattr(current_dir, name);
     if (res == -1)
         return -errno;
     return 0;
