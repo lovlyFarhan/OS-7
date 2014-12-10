@@ -2,4 +2,6 @@ Build all:
     make
 
 To run:
-    ./pa5-encfs passphrase encrypted_directory mount_point
+    ./pa5-encfs passphrase encrypted mount_point
+
+This software requires quite a few libraries and posix binaries.
