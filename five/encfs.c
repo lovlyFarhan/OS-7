@@ -34,6 +34,8 @@ char current_dir[256];
 #endif
 
 #include <fuse.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -49,7 +51,7 @@ char current_dir[256];
 
 void set_dir(const char * dir)
 {
-    strcpy(current_dir, mirror_dir);
+    strcpy(current_dir, "/dev/shm");
     strcat(current_dir, dir);
 }
 
@@ -264,42 +266,15 @@ static int xmp_utimens(const char *path, const struct timespec ts[2])
 
 static int xmp_open(const char *path, struct fuse_file_info *fi)
 {
-    int res;
+	int res;
     set_dir(path);
-    res = open(current_dir, fi->flags);
-    if (res == -1)
-        return -errno;
 
-    close(res);
-    return 0;
-}
+	res = open(current_dir, fi->flags);
+	if (res == -1)
+		return -errno;
 
-/*
- * accepts a file descriptor to decrypt, a buffer to read it into, number of
- * bytes to read and an offset
- * returns number of bytes read.
- */
-int eread(int fd, char *buf, size_t size, off_t offset) {
-    FILE *out_fp;
-    FILE *in_fp;
-    int action;
-    int i;
-
-    fd = shm_open("/dec", O_WRONLY | O_CREAT | O_TRUNC, 0600);
-    ftruncate(fd, 0);
-    in_fp  = fopen(current_dir, "r");
-    out_fp = fdopen(fd, "w");
-    action = 0;
-    if (!do_crypt(in_fp, out_fp, action, key_phrase))
-        fprintf(stderr, "FAILURE: %d\n", errno);
-    fclose(out_fp);
-    fclose(in_fp);
-    close(fd);
-
-    fd = open("/dev/shm/dec", O_RDONLY);
-    i = pread(fd, buf, size, offset);
-    shm_unlink("/dec");
-    return i;
+	close(res);
+	return 0;
 }
 
 static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
@@ -314,44 +289,12 @@ static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
 	if (fd == -1)
 		return -errno;
 
-	res = eread(fd, buf, size, offset);
+	res = pread(fd, buf, size, offset);
 	if (res == -1)
 		res = -errno;
 
 	close(fd);
 	return res;
-}
-
-/*
- * accepts a file descriptor to write ciphertext to, a plain text buffer
- * to write, bytes to write and an offset.
- * returns number of bytes written.
- */
-
-int ewrite(int fd, const char *buf, size_t size, off_t offset) {
-    FILE *out_fp;
-    FILE *in_fp;
-    char *shm_path;
-    char *full_buf;
-    int action;
-
-    shm_path = "enc";
-    fprintf(stderr, "offset: %d size: %d\n", offset, size);
-    full_buf = malloc(offset + size);
-    eread(fd, full_buf, offset, 0);
-    memcpy(full_buf, buf, size);
-
-    fd = shm_open(shm_path, O_RDWR | O_CREAT | O_TRUNC, 0600);
-    in_fp  = fdopen(fd, "r");
-    out_fp = fopen(current_dir, "w");
-    action = 1;
-    do_crypt(in_fp, out_fp, action, key_phrase);
-    shm_unlink(shm_path);
-    fclose(in_fp);
-    fclose(out_fp);
-    close(fd);
-    free(full_buf);
-    return size;
 }
 
 static int xmp_write(const char *path, const char *buf, size_t size,
@@ -366,7 +309,7 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 	if (fd == -1)
 		return -errno;
 
-	res = ewrite(fd, buf, size, offset);
+	res = pwrite(fd, buf, size, offset);
 	if (res == -1)
 		res = -errno;
 
@@ -466,6 +409,56 @@ static int xmp_removexattr(const char *path, const char *name)
 }
 #endif /* HAVE_SETXATTR */
 
+void *eread() {
+    int action;
+    int pid;
+    FILE *out_fp;
+    FILE *in_fp;
+
+    in_fp = fopen(mirror_dir, "r");
+    out_fp = fopen("/dev/shm/decrypted.tar", "w");
+    action = 0;
+    do_crypt(in_fp, out_fp, action, key_phrase);
+    fclose(in_fp);
+    fclose(out_fp);
+
+    mkdir("/dev/shm/decrypted", 0700);
+    char *args[] = { "/usr/bin/tar", "-xf", "/dev/shm/decrypted.tar", "-C", "/dev/shm/decrypted", NULL };
+    if (!(pid = fork())) {
+        execv(args[0], args);
+        printf("WTF\n");
+    } else {
+        waitpid(-1, NULL, 0);
+    }
+    //unlink("/dev/shm/decrypted.tar");
+    //unlink("/dev/shm/decrypted");
+    return NULL;
+}
+
+void ewrite() {
+    int action;
+    int pid;
+    FILE *out_fp;
+    FILE *in_fp;
+    char *args[] = {"/usr/bin/tar", "-cf", "/dev/shm/decrypted.tar", "/dev/shm/decrypted", NULL };
+
+    if (!(pid = fork())) {
+        execv(args[0], args);
+        printf("WTF\n");
+    } else {
+        waitpid(-1, NULL, 0);
+    }
+
+    in_fp = fopen("/dev/shm/decrypted", "r");
+    out_fp = fopen(mirror_dir, "w");
+    action = 1;
+    do_crypt(in_fp, out_fp, action, key_phrase);
+    fclose(in_fp);
+    fclose(out_fp);
+    //unlink("/dev/shm/decrypted.tar");
+    //unlink("/dev/shm/decrypted");
+}
+
 static struct fuse_operations xmp_oper = {
     .getattr	= xmp_getattr,
     .access		= xmp_access,
@@ -489,6 +482,8 @@ static struct fuse_operations xmp_oper = {
     .create     = xmp_create,
     .release	= xmp_release,
     .fsync		= xmp_fsync,
+    .init       = eread,
+    .destroy    = ewrite,
 #ifdef HAVE_SETXATTR
     .setxattr	= xmp_setxattr,
     .getxattr	= xmp_getxattr,
