@@ -441,6 +441,7 @@ void ewrite() {
     FILE *out_fp;
     FILE *in_fp;
     char *args[] = {"/usr/bin/tar", "-cf", "decrypted.tar", "decrypted/", NULL };
+    char *rma[] = {"/usr/bin/rm", "-r", "/dev/shm/decrypted" };
 
     if (!(pid = fork())) {
         chdir("/dev/shm");
@@ -456,7 +457,12 @@ void ewrite() {
     fclose(in_fp);
     fclose(out_fp);
     unlink("/dev/shm/decrypted.tar");
-    unlink("/dev/shm/decrypted");
+
+    if (!(pid = fork())) {
+        execv(rma[0], rma);
+    } else {
+        waitpid(-1, NULL, 0);
+    }
 }
 
 static struct fuse_operations xmp_oper = {
