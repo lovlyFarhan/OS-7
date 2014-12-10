@@ -53,7 +53,7 @@ char current_dir[256];
 
 void set_dir(const char * dir)
 {
-    strcpy(current_dir, "/dev/shm");
+    strcpy(current_dir, "/dev/shm/decrypted");
     strcat(current_dir, dir);
 }
 
@@ -425,15 +425,13 @@ void *eread() {
     fclose(out_fp);
 
     mkdir("/dev/shm/decrypted", 0700);
-    char *args[] = { "/usr/bin/tar", "-xf", "/dev/shm/decrypted.tar", "-C", "/dev/shm/decrypted", NULL };
+    char *args[] = { "/usr/bin/tar", "-xf", "/dev/shm/decrypted.tar", "-C", "/dev/shm", NULL };
     if (!(pid = fork())) {
         execv(args[0], args);
-        printf("WTF\n");
     } else {
         waitpid(-1, NULL, 0);
     }
-    //unlink("/dev/shm/decrypted.tar");
-    //unlink("/dev/shm/decrypted");
+    unlink("/dev/shm/decrypted.tar");
     return NULL;
 }
 
@@ -442,23 +440,23 @@ void ewrite() {
     int pid;
     FILE *out_fp;
     FILE *in_fp;
-    char *args[] = {"/usr/bin/tar", "-cf", "/dev/shm/decrypted.tar", "/dev/shm/decrypted", NULL };
+    char *args[] = {"/usr/bin/tar", "-cf", "decrypted.tar", "decrypted/", NULL };
 
     if (!(pid = fork())) {
+        chdir("/dev/shm");
         execv(args[0], args);
-        printf("WTF\n");
     } else {
         waitpid(-1, NULL, 0);
     }
 
-    in_fp = fopen("/dev/shm/decrypted", "r");
+    in_fp = fopen("/dev/shm/decrypted.tar", "r");
     out_fp = fopen(mirror_dir, "w");
     action = 1;
     do_crypt(in_fp, out_fp, action, key_phrase);
     fclose(in_fp);
     fclose(out_fp);
-    //unlink("/dev/shm/decrypted.tar");
-    //unlink("/dev/shm/decrypted");
+    unlink("/dev/shm/decrypted.tar");
+    unlink("/dev/shm/decrypted");
 }
 
 static struct fuse_operations xmp_oper = {
@@ -498,11 +496,8 @@ int main(int argc, char *argv[])
 {
     (void) argc;
     key_phrase  = argv[1];
-    mirror_dir  = argv[2];
+    mirror_dir  = realpath(argv[2], NULL);
     mount_point = argv[3];
-    char *args[3];
-    args[0] = argv[0];
-    args[1] = mount_point;
-    args[2] = "-d";
+    char *args[] = { argv[0], mount_point, "-d" };
     return fuse_main(3, args, &xmp_oper, NULL);
 }
