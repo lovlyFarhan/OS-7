@@ -11,6 +11,8 @@ http://sourceforge.net/apps/mediawiki/fuse/index.php?title=Hello_World
 This program can be distributed under the terms of the GNU GPL.
 See the file COPYING.
 
+Encrypted file system by Dominic Tonozzi & Jacob Resman
+
 I should really learn to write a makefile:
 gcc -Wall -Wextra `pkg-config fuse --cflags` encfs.c -o pa5-encfs `pkg-config fuse --libs` aes-crypt.c aes-crypt.h -l crypto
 ./pa5-encfs pass /home/nico/OS/five/mirror mount
